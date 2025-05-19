@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Game Playground</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f3f4f8; }
+    nav { background: #6200ea; color: #fff; padding: 1em; display: flex; gap: 1em; }
+    nav a { color: #fff; text-decoration: none; font-weight: bold; }
+    nav a.active { text-decoration: underline; }
+    .container { max-width: 700px; margin: 2em auto; background: #fff; border-radius: 8px; padding: 2em; box-shadow: 0 2px 8px #aaa2; }
+    .hidden { display: none; }
+    textarea { width: 100%; min-height: 100px; font-family: monospace; }
+    .game { border: 1px solid #ddd; margin: 1em 0; padding: 1em; border-radius: 6px; }
+    .comment { font-size: 0.95em; padding-left: 1em; margin-bottom: 0.5em; }
+    #profile-img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; display: block; margin-bottom: 1em; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="#" id="nav-develop" class="active">Develop</a>
+    <a href="#" id="nav-games">Games</a>
+    <a href="#" id="nav-profile">Profile</a>
+    <span style="margin-left:auto;" id="user-info"></span>
+  </nav>
+  <div class="container">
+    <!-- Develop Page -->
+    <div id="page-develop">
+      <h2>Develop a Game</h2>
+      <div id="develop-login" class="hidden">
+        <p>You must be logged in to create a game.</p>
+      </div>
+      <div id="develop-form">
+        <label>Game Name: <input id="game-name" /></label><br><br>
+        <label>Game HTML Code:</label><br>
+        <textarea id="game-code">&lt;h1&gt;My Cool Game!&lt;/h1&gt;</textarea><br>
+        <button onclick="publishGame()">Publish Game</button>
+      </div>
+    </div>
+
+    <!-- Games Page -->
+    <div id="page-games" class="hidden">
+      <h2>Games</h2>
+      <div id="games-list"></div>
+    </div>
+
+    <!-- Profile Page -->
+    <div id="page-profile" class="hidden">
+      <h2>Profile</h2>
+      <div id="profile-login" class="hidden">
+        <input id="profile-username" placeholder="Enter username" />
+        <input id="profile-password" type="password" placeholder="Enter password" />
+        <button onclick="login()">Login</button>
+        <button onclick="register()">Register</button>
+      </div>
+      <div id="profile-info">
+        <img id="profile-img" src="https://api.dicebear.com/7.x/thumbs/svg?seed=User" alt="Profile Image"/>
+        <input type="file" id="upload-img" accept="image/*" onchange="changeProfileImg(event)" /><br>
+        <label>Username: <input id="profile-name" /></label>
+        <button onclick="saveProfile()">Save Profile</button>
+        <button onclick="logout()">Logout</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Simple in-memory storage (persists if you use localStorage)
+  let games = JSON.parse(localStorage.getItem('games') || '[]');
+  let comments = JSON.parse(localStorage.getItem('comments') || '{}');
+  let user = JSON.parse(localStorage.getItem('user') || 'null');
+
+  // Navigation
+  function showPage(page) {
+    document.querySelectorAll('.container > div').forEach(div => div.classList.add('hidden'));
+    document.getElementById('page-' + page).classList.remove('hidden');
+    document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+    document.getElementById('nav-' + page).classList.add('active');
+    if (page === 'games') renderGames();
+    if (page === 'profile') renderProfile();
+    if (page === 'develop') renderDevelop();
+  }
+  document.getElementById('nav-develop').onclick = () => showPage('develop');
+  document.getElementById('nav-games').onclick = () => showPage('games');
+  document.getElementById('nav-profile').onclick = () => showPage('profile');
+
+  // Develop Page
+  function renderDevelop() {
+    document.getElementById('develop-form').style.display = user ? '' : 'none';
+    document.getElementById('develop-login').style.display = user ? 'none' : '';
+  }
+  function publishGame() {
+    if (!user) return alert('Please log in!');
+    const name = document.getElementById('game-name').value.trim();
+    const code = document.getElementById('game-code').value;
+    if (!name || !code) return alert('Fill out all fields!');
+    games.push({ name, code, author: user.name });
+    localStorage.setItem('games', JSON.stringify(games));
+    alert('Game published!');
+    document.getElementById('game-name').value = '';
+    document.getElementById('game-code').value = '';
+  }
+
+  // Games Page
+  function renderGames() {
+    let html = '';
+    games.forEach((game, i) => {
+      html += `<div class="game">
+        <strong>${game.name}</strong> by <em>${game.author}</em>
+        <div>${game.code}</div>
+        <div>
+          <h4>Comments</h4>
+          <div id="comments-${i}">
+            ${(comments[i]||[]).map(c => `<div class="comment"><b>${c.user}:</b> ${c.text}</div>`).join('')}
+          </div>
+          ${user ? `
+            <input id="comment-input-${i}" placeholder="Add a comment" />
+            <button onclick="addComment(${i})">Comment</button>
+          ` : '<em>Log in to comment</em>'}
+        </div>
+      </div>`;
+    });
+    document.getElementById('games-list').innerHTML = html;
+  }
+  function addComment(i) {
+    if (!user) return;
+    const input = document.getElementById(`comment-input-${i}`);
+    const text = input.value.trim();
+    if (!text) return;
+    if (!comments[i]) comments[i] = [];
+    comments[i].push({ user: user.name, text });
+    localStorage.setItem('comments', JSON.stringify(comments));
+    renderGames();
+  }
+
+  // Profile Page
+  function renderProfile() {
+    document.getElementById('profile-login').style.display = user ? 'none' : '';
+    document.getElementById('profile-info').style.display = user ? '' : 'none';
+    if (user) {
+      document.getElementById('profile-name').value = user.name;
+      document.getElementById('profile-img').src = user.img || "https://api.dicebear.com/7.x/thumbs/svg?seed=User";
+      document.getElementById('user-info').textContent = 'Hello, ' + user.name;
+    } else {
+      document.getElementById('user-info').textContent = '';
+    }
+  }
+  function login() {
+    const name = document.getElementById('profile-username').value.trim();
+    const pass = document.getElementById('profile-password').value;
+    const stored = JSON.parse(localStorage.getItem('users') || '{}');
+    if (stored[name] && stored[name].pass === pass) {
+      user = { name, img: stored[name].img || '' };
+      localStorage.setItem('user', JSON.stringify(user));
+      renderProfile();
+      renderDevelop();
+      alert('Logged in!');
+    } else {
+      alert('Wrong username or password!');
+    }
+  }
+  function register() {
+    const name = document.getElementById('profile-username').value.trim();
+    const pass = document.getElementById('profile-password').value;
+    if (!name || !pass) return alert('Fill out both fields!');
+    let stored = JSON.parse(localStorage.getItem('users') || '{}');
+    if (stored[name]) return alert('User exists!');
+    stored[name] = { pass };
+    localStorage.setItem('users', JSON.stringify(stored));
+    alert('Registered! Now log in.');
+  }
+  function saveProfile() {
+    const newName = document.getElementById('profile-name').value.trim();
+    if (!newName) return alert('Name required.');
+    let stored = JSON.parse(localStorage.getItem('users') || '{}');
+    stored[user.name] = stored[user.name] || {};
+    stored[user.name].img = user.img;
+    stored[user.name].pass = stored[user.name].pass; // keep password
+    if (newName !== user.name) {
+      stored[newName] = stored[user.name];
+      delete stored[user.name];
+      user.name = newName;
+    }
+    localStorage.setItem('users', JSON.stringify(stored));
+    localStorage.setItem('user', JSON.stringify(user));
+    alert('Profile saved!');
+    renderProfile();
+  }
+  function logout() {
+    user = null;
+    localStorage.removeItem('user');
+    renderProfile();
+    renderDevelop();
+  }
+  function changeProfileImg(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      user.img = evt.target.result;
+      document.getElementById('profile-img').src = user.img;
+      saveProfile();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Initial rendering
+  showPage('develop');
+  renderProfile();
+  renderDevelop();
+</script>
+</body>
+</html>
